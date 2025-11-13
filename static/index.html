@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Processes</title>
+        <meta charset=utf-8>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+        <script>
+window.addEventListener("load", () => {
+    const source = new EventSource("/processes");
+    let safe = [];
+    source.addEventListener('killed_process', data => {
+        let process = JSON.parse(data.data);
+        let entry = document.getElementById(process.name);
+        if( !entry ) return;
+        
+        entry.remove();
+    });
+    source.addEventListener('created_process', data => {
+        let process = JSON.parse(data.data);
+        let entry = document.getElementById(process.name);
+        if( !entry ){
+            let template = document.getElementById("process-template");
+            let frag = template.content.cloneNode(true);
+            entry = frag.firstElementChild;
+            entry.id = process.name;
+            entry.querySelector("[name='name']").innerText = process.name;
+        }
+        if( process.running ) {
+            entry.querySelector("[data-running='true']").classList.remove("d-none");
+            entry.querySelector("[data-running='false']").classList.add("d-none");
+        } else {
+            entry.querySelector("[data-running='true']").classList.add("d-none");
+            entry.querySelector("[data-running='false']").classList.remove("d-none");
+        }
+        entry.querySelector("[name='pid']").innerText = process.pid || "";
+        entry.querySelector("[name='last-run']").innerText = process.lastRun || "";
+        entry.querySelector("[name='last-exit']").innerText = process.lastExit || "";
+        entry.querySelector("[name='stdout']").value = process.stdout;
+        entry.querySelector("[name='stderr']").value = process.stderr;
+        entry.querySelector("[name='process']").value = process.name;
+        document.getElementById("processes").appendChild(entry);
+    });
+    source.addEventListener('updated_process', data => {
+        let process = JSON.parse(data.data);
+        let entry = document.getElementById(process.name);
+        if( !entry ) return;
+        if( process.running ) {
+            entry.querySelector("[data-running='true']").classList.remove("d-none");
+            entry.querySelector("[data-running='false']").classList.add("d-none");
+        } else {
+            entry.querySelector("[data-running='true']").classList.add("d-none");
+            entry.querySelector("[data-running='false']").classList.remove("d-none");
+        }
+        if( !process.pid ) {
+            entry.querySelector("[name='pid']").innerText = "";
+        }
+        entry.querySelector("[name='last-run']").innerText = process.lastRun || "";
+        entry.querySelector("[name='last-exit']").innerText = process.lastExit || "";
+        entry.querySelector("[name='stdout']").value = process.stdout;
+        entry.querySelector("[name='stderr']").value = process.stderr;
+    })
+})
+
+let pad0 = n => n > 0 && n < 10 ? `0${n}` : `${n}`
+
+        </script>
+    </head>
+    <body class="container">
+        <main id="processes" class="mt-4"></main>
+        <template id="process-template">
+            <article class="border rounded p-3 mb-2">
+                <section class="row mb-2">
+                    <div class="col-9 ">
+                        <div class="d-flex align-items-baseline mb-0">
+                            <div data-running="true">
+                                <span class="badge bg-success" name="pid"></span>
+                            </div>
+                            <div data-running="false">
+                                <i class="bi bi-circle text-danger"></i>
+                            </div>
+                            &nbsp;<span name="name"></span>
+                        </div>
+                        <p class="text-muted small m-0">Last run:&nbsp;<span name="last-run"></span></p>
+                        <p class="text-muted small m-0">Last exit:&nbsp;<span name="last-exit"></span></p>
+                    </div>
+                    <form class="col-3 d-flex align-items-baseline justify-content-end" method="post">
+                        <input type="hidden" name="process" value="">
+                        <button type="submit" formaction="/run" class="btn text-success mx-2 p-0"><i class="bi bi-play-circle"></i></button>
+                        <button type="submit" formaction="/kill" class="btn text-danger mx-2 p-0 "><i class="bi bi-x-circle"></i></button>
+                    </form>
+                </section>
+                <section class="row">
+                    <div class="col-6">
+                        <textarea readonly disabled rows="8" cols="20" class="form-control" name="stdout"></textarea>
+                    </div>
+                    <div class="col-6">
+                        <textarea readonly disabled rows="8" cols="20" class="form-control" name="stderr"></textarea>
+                    </div>
+                </section>
+            </article>
+        </template>
+    </body>
+</html>
