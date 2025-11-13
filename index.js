@@ -85,6 +85,14 @@ app.post('/run', express.urlencoded({extended:true}), (req,res) => {
     res.status(204).end();
 })
 
+app.post('/restart', express.urlencoded({extended:true}), (req,res) => {
+    if( req.body.process ){
+        killService(req.body.process)
+        forkService(req.body.process)
+    }
+    res.status(204).end();
+})
+
 app.listen(6000, 'localhost', () => {
     console.log('Server listening')
 })
