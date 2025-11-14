@@ -9,7 +9,6 @@
         <script>
 window.addEventListener("load", () => {
     const source = new EventSource("/processes");
-    let safe = [];
     source.addEventListener('killed_process', data => {
         let process = JSON.parse(data.data);
         let entry = document.getElementById(process.name);
@@ -64,39 +63,34 @@ window.addEventListener("load", () => {
         entry.querySelector("[name='stderr']").value = process.stderr;
     })
 })
-
-let pad0 = n => n > 0 && n < 10 ? `0${n}` : `${n}`
-
         </script>
     </head>
     <body class="container">
         <main id="processes" class="mt-4"></main>
         <template id="process-template">
             <article class="border rounded p-3 mb-2 row">
-                    <div class="col-3 d-flex flex-column justify-content-start">
-                        <div class="d-flex align-items-baseline mb-0">
-                            <div data-running="true">
-                                <span class="badge bg-success" name="pid"></span>
-                            </div>
-                            <div data-running="false">
-                                <i class="bi bi-circle text-danger"></i>
-                            </div>
-                            &nbsp;<span name="name"></span>
-                            <form class="d-flex align-items-baseline" method="post">
-                                <input type="hidden" name="process" value="">
-                                <button type="submit" formaction="/run" class="btn text-success mx-2 p-0"><i class="bi bi-play-circle"></i></button>
-                                <button type="submit" formaction="/restart" class="btn text-warning mx-2 p-0 "><i class="bi bi-skip-start-circle"></i></button>
-                                <button type="submit" formaction="/kill" class="btn text-danger mx-2 p-0 "><i class="bi bi-x-circle"></i></button>
-                            </form>
+                <form class="col-3 mb-0" method="post">
+                        <input type="hidden" name="process" value="">
+                        <div data-running="true">
+                            <span class="badge bg-success" name="pid"></span>
                         </div>
+                        <div data-running="false">
+                            <i class="bi bi-circle text-danger"></i>
+                        </div>
+                        <span name="name"></span>
                         <p class="text-muted small m-0">Last run:&nbsp;<code name="last-run"></code></p>
                         <p class="text-muted small m-0">Last exit:&nbsp;<code name="last-exit"></code></p>
                         <p class="text-muted small m-0">Local address:&nbsp;<code name="local-address"></code></p>
-                    </div>
-                    <div class="col-9 d-flex justify-content-between gap-2">
-                        <textarea readonly disabled rows="2" cols="20" class="form-control" name="stdout"></textarea>
-                        <textarea readonly disabled rows="2" cols="20" class="form-control" name="stderr"></textarea>
-                    </div>
+                        <div>
+                            <button type="submit" formaction="/run" class="btn text-success mx-2 p-0"><i class="bi bi-play-circle"></i></button>
+                            <button type="submit" formaction="/restart" class="btn text-warning mx-2 p-0 "><i class="bi bi-skip-start-circle"></i></button>
+                            <button type="submit" formaction="/kill" class="btn text-danger mx-2 p-0 "><i class="bi bi-x-circle"></i></button>
+                        </div>
+                </form>
+                <div class="col-9 d-flex justify-content-between gap-2">
+                    <textarea readonly disabled rows="2" cols="20" class="form-control" name="stdout"></textarea>
+                    <textarea readonly disabled rows="2" cols="20" class="form-control" name="stderr"></textarea>
+                </div>
             </article>
         </template>
     </body>
