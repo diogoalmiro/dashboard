@@ -5,9 +5,16 @@ if( !FOLDER ){
     process.exit(1);
 }
 
+const PORT = parseInt(process.env.PORT || '6000');
+
+if( isNaN(PORT) ){
+    console.error('PORT is not a number');
+    process.exit(1);
+}
+
 
 const fs = require('fs');
-const {fork} = require('child_process');
+const {fork, exec, execSync} = require('child_process');
 const {EventEmitter} = require('events');
 
 const processes = {}
@@ -38,6 +45,7 @@ app.get('/processes', (req,res) => {
             data.stderr = process.stderrArr.join('');
             data.lastRun = process.lastRun;
             data.lastExit = process.lastExit;
+            data.localAddress = data.running ? process.localAddress : null;
         }
         res.write(`event: ${type}\n`);
         res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -93,31 +101,9 @@ app.post('/restart', express.urlencoded({extended:true}), (req,res) => {
     res.status(204).end();
 })
 
-app.listen(6000, 'localhost', () => {
+app.listen(PORT, 'localhost', () => {
     console.log('Server listening')
 })
-
-fs.promises.readdir(FOLDER)
-    .then(services =>
-        services.forEach(forkService))
-    .then(_ => {
-        fs.watch(FOLDER, (type, service) => {
-            if( type == 'rename' ){
-                if( service in processes ){
-                    killService(service)
-                    delete processes[service];
-                    eventEmitter.emit('killed_process', service);
-                }
-                else {
-                    forkService(service)
-                }
-            }
-            if( type == 'change' ){
-                killService(service)
-                forkService(service)
-            }
-        })
-    })
 
 function killService(service){
     if( !service.endsWith(".js") )
@@ -157,3 +143,76 @@ function forkService(service){
         eventEmitter.emit('update_process', service);
     })
 }
+
+
+async function getLocalAddresses(){
+    let lines = await new Promise((resolve, reject) => {
+        let proces = exec(`netstat -tulpn 2> /dev/null | grep -i listen | tr -s " " ","`, {encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000});
+        let stdout = '';
+        proces.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+        proces.on('exit', () => {
+            if( proces.exitCode == 0){
+                resolve(stdout.trim().split('\n'));
+            }
+            else {
+                reject(new Error(`Failed to get ports: ${proces.exitCode}`));
+            }
+        });
+    });
+    let localAddresses = {};
+    for( let line of lines ){
+        if( line.trim() == '' ) continue;
+        let [_protocol, _1, _2, localAddress, _remoteAddress, _3, pidProcess] = line.split(',');
+        let pid = pidProcess.split('/').at(0);
+        localAddresses[pid] = localAddress;
+    }
+    return localAddresses;
+}
+
+// After a process is created, wait an update all running processes ports
+let updatingLocalAddresses = false;
+eventEmitter.on('created_process', (service) => {
+    if( updatingLocalAddresses ) return;
+    updatingLocalAddresses = true;
+    setTimeout(() => {
+        getLocalAddresses().then(localAddresses => {
+            console.log('Local addresses:', localAddresses);
+            for( let processName in processes ){
+                let process = processes[processName];
+                let localAddress = localAddresses[process.pid];
+                if( localAddress ){
+                    process.localAddress = localAddress;
+                    eventEmitter.emit('update_process', processName);
+                }
+            }
+        }).catch(error => {
+            console.error(error);
+        }).finally(() => {
+            updatingLocalAddresses = false;
+        });
+    }, 1500);
+});
+
+fs.promises.readdir(FOLDER)
+    .then(services =>
+        services.forEach(forkService))
+    .then(_ => {
+        fs.watch(FOLDER, (type, service) => {
+            if( type == 'rename' ){
+                if( service in processes ){
+                    killService(service)
+                    delete processes[service];
+                    eventEmitter.emit('killed_process', service);
+                }
+                else {
+                    forkService(service)
+                }
+            }
+            if( type == 'change' ){
+                killService(service)
+                forkService(service)
+            }
+        })
+    })
