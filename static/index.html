@@ -9,6 +9,12 @@
         <script>
 window.addEventListener("load", () => {
     const source = new EventSource("/processes");
+    source.addEventListener('error', () => {
+        document.querySelector("[name='error-message']").classList.remove("d-none");
+    })
+    source.addEventListener('open', () => {
+        document.querySelector("[name='error-message']").classList.add("d-none");
+    })
     source.addEventListener('killed_process', data => {
         let process = JSON.parse(data.data);
         let entry = document.getElementById(process.name);
@@ -66,6 +72,10 @@ window.addEventListener("load", () => {
         </script>
     </head>
     <body class="container">
+        <div class="position-fixed top-0 start-0 end-0 m-2 alert alert-secondary text-center d-none" role="alert" name="error-message">
+            <h3>Disconnected!</h3>
+        </div>
+        </div>
         <main id="processes" class="mt-4"></main>
         <template id="process-template">
             <article class="border rounded p-3 mb-2 row">
